@@ -13,7 +13,6 @@ Clarinet.test({
         const deployer = accounts.get('deployer')!;
         const wallet1 = accounts.get('wallet_1')!;
         
-        // Create session as owner
         let block = chain.mineBlock([
             Tx.contractCall('zentrek', 'create-session', 
                 [types.ascii("Morning Meditation"), types.uint(300), types.uint(10)], 
@@ -23,7 +22,6 @@ Clarinet.test({
         assertEquals(block.receipts.length, 1);
         block.receipts[0].result.expectOk().expectUint(1);
         
-        // Try creating session as non-owner
         block = chain.mineBlock([
             Tx.contractCall('zentrek', 'create-session',
                 [types.ascii("Evening Meditation"), types.uint(300), types.uint(10)],
@@ -35,25 +33,35 @@ Clarinet.test({
 });
 
 Clarinet.test({
-    name: "Test session flow - start and complete",
+    name: "Test complete session flow with pause/resume",
     async fn(chain: Chain, accounts: Map<string, Account>) {
         const deployer = accounts.get('deployer')!;
         const wallet1 = accounts.get('wallet_1')!;
         
-        // Create session
+        // Create and start session
         let block = chain.mineBlock([
             Tx.contractCall('zentrek', 'create-session',
                 [types.ascii("Morning Meditation"), types.uint(300), types.uint(10)],
-                deployer.address)
-        ]);
-        
-        // Start session
-        block = chain.mineBlock([
+                deployer.address),
             Tx.contractCall('zentrek', 'start-session',
                 [types.uint(1)],
                 wallet1.address)
         ]);
         
+        // Pause session
+        block = chain.mineBlock([
+            Tx.contractCall('zentrek', 'pause-session',
+                [],
+                wallet1.address)
+        ]);
+        block.receipts[0].result.expectOk().expectBool(true);
+        
+        // Resume session
+        block = chain.mineBlock([
+            Tx.contractCall('zentrek', 'resume-session',
+                [],
+                wallet1.address)
+        ]);
         block.receipts[0].result.expectOk().expectBool(true);
         
         // Complete session
@@ -62,15 +70,13 @@ Clarinet.test({
                 [types.uint(1)],
                 wallet1.address)
         ]);
-        
         block.receipts[0].result.expectOk().expectBool(true);
         
-        // Check stats
+        // Verify stats
         const response = chain.callReadOnlyFn('zentrek', 'get-user-stats',
             [types.principal(wallet1.address)],
             wallet1.address
         );
-        
         response.result.expectOk().expectSome();
     }
 });
